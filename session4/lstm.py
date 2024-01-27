@@ -3,20 +3,22 @@ import torch.nn as nn
 import torch
 import torch.optim as optim
 
+# 这个程序通过 RNN + LSTM 完成了 sin 函数的时序预测
+
 # 产生正弦波动数据
 seq_length = 20
 num_samples = 1000
 
 
 # 由于这里的sin波生成函数会重复使用，所以改为使用函数定义，输入一个数据数量，结果是随机的
-def sin_gen(num_step):
+def sin_gen(num_sample):
     time_steps = np.linspace(0, np.pi, seq_length + 1)  # 在 [0, \pi] 上分为 20 区间
     data = np.sin(time_steps)
     data = data[:-1].reshape(-1, seq_length)  # -1 表示自动计算维度, 这里删掉了最后一个数据然后变形
 
     # 复杂化数列
-    x = np.repeat(data, num_samples, axis=0)
-    y = np.sin(time_steps[-1] * np.ones((num_samples, 1)))
+    x = np.repeat(data, num_sample, axis=0)
+    y = np.sin(time_steps[-1] * np.ones((num_sample, 1)))
 
     # 转变成张量
     x_tensor_otp = torch.FloatTensor(x).unsqueeze(2)  # 能让处理数据的时候更加灵活
