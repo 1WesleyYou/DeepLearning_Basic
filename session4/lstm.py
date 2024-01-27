@@ -1,6 +1,7 @@
 import numpy as np
 import torch.nn as nn
 import torch
+import torch.optim as optim
 
 # 产生正弦波动数据
 seq_length = 20
@@ -33,3 +34,20 @@ class LstmNNModel(nn.Module):
         out, _ = self.lstm(x, (hide_ini, cell_ini))  # 丢弃返回的隐藏状态单元，保留 x (seq_len, batch_size, hidden_size) 的张量
         out = self.fc(out[:, -1:])  # 这里用out而非x可以让操作更加灵活，解释器不容易报错
         return out
+
+
+# 定义这个模型、优化器
+model = LstmNNModel()
+criterion = torch.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+num_epochs = 10
+for epoch in range(num_epochs):
+    optimizer.zero_grad()
+    output = model(x_tensor)
+    loss = criterion(output, y_tensor)
+    loss.backward()
+    optimizer.step()
+    if (epoch + 1) % 10 == 0:
+        print(f'Epoch [{epoch + 1}/100], Loss: {loss.item():.4f}')
+
