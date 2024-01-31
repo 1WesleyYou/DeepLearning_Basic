@@ -7,41 +7,11 @@ import matplotlib.pyplot as plt
 from collections import deque
 import matplotlib.animation as animation
 import random
+from model import QNetwork, ReplayBuffer, state_size, action_size
+from tqdm import tqdm
 
 # 初始化gym条件，满足项目要求
 env = gym.make('CartPole-v1', render_mode='rgb_array')
-
-
-class QNetwork(nn.Module):
-    def __init__(self, state_size, action_size):  # 状态和行为分别为输入输出尺寸
-        super(QNetwork, self).__init__()
-        self.fc = nn.Linear(state_size, 64)
-        self.out = nn.Linear(64, action_size)
-
-    def forward(self, state):
-        x = torch.relu(self.fc(state))
-        x = self.out(x)
-        return x
-
-
-class ReplayBuffer:
-    # 存储和采样经验回放数据，以用于训练神经网络
-    def __init__(self, capacity):
-        self.memory = deque(maxlen=capacity)  # 双队列存储数据，不超过容量上限 capacity
-
-    def add(self, state, action, reward, next_state, done):
-        # 向回放缓冲器中添加一条经验数据
-        # state, action, reward 分别表示状态、动作、奖励数据
-        # done 表示是否完成
-        self.memory.append((state, action, reward, next_state, done))  # 将这个指令加到记忆序列的最后，如果超过了最大的值就会剔除最老的记忆
-
-    def sample(self, batch_size):
-        # 随机抽取一组数据用于神经网络训练
-        return random.sample(self.memory, batch_size)
-
-
-state_size = env.observation_space.shape[0]
-action_size = env.action_space.n
 
 q_network = QNetwork(state_size, action_size)
 optimizer = optim.Adam(q_network.parameters(), lr=0.001)
@@ -51,9 +21,17 @@ batch_size = 64
 gamma = 0.99  # discount factor
 epsilon = 1.0  # 贪心算法系数，用于表示 探索 和 利用 的概率比例
 
-num_episodes = 1000
+num_episodes = 100000
+
+cases_chart = []
+reward_chart = []
+(max_x, max_y) = (0, 0)
+
+process_bar = tqdm(total=100, desc="process")
 
 for episode in range(num_episodes):
+    process_bar.update(0.00001)
+    cases_chart.append(episode)
     # 进行多轮游戏的迭代
     state = env.reset()[0]
     done = False
@@ -99,7 +77,7 @@ for episode in range(num_episodes):
 
             current_q_values = q_network(state_batch).gather(1, action_batch.unsqueeze(1))
             next_max_q_values = q_network(next_state_batch).max(1)[0]
-            target_q_values = reward_batch + (gamma * next_max_q_values * not_done_mask)
+            target_q_values = reward_batch + (gamma * next_max_q_values * not_done_mask)  # not_done_mask 是防止终止对于结果的影响
 
             loss = nn.MSELoss()(current_q_values, target_q_values.unsqueeze(1))
 
@@ -111,10 +89,20 @@ for episode in range(num_episodes):
     if epsilon > 0.05:
         epsilon *= 0.995
 
-    print(f'Episode {episode}, Total Reward: {total_reward}')
+    reward_chart.append(total_reward)
 
-# 创造图像
-fig, ax = plt.subplots()
+    if max_y < total_reward:
+        max_x = episode
+        max_y = total_reward
+        torch.save(q_network.state_dict(), '/home/whoami/Desktop/DeepLearning_Basic/pythonProject/session6/model.pth')
+
+    # print(f'Episode {episode}, Total Reward: {total_reward}')
+
+# fig, ax = plt.subplots()
+plt.plot(cases_chart, reward_chart)
+plt.scatter(max_x, max_y)
+plt.show()
+print(f"the best model is episode {max_x}, with largest reward {max_y}")
 
 
 # 评估训练结果
@@ -154,4 +142,4 @@ def animate_frames(frames):
 
 trained_agent = q_network  # Replace with your trained Q-network
 frames = test_agent(env, trained_agent)
-animate_frames(frames)
+# animate_frames(frames)
