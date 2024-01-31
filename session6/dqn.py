@@ -13,7 +13,7 @@ from tqdm import tqdm
 # 初始化gym条件，满足项目要求
 env = gym.make('CartPole-v1', render_mode='rgb_array')
 
-q_network = QNetwork(state_size, action_size)
+q_network = QNetwork(state_size, action_size).cuda()
 optimizer = optim.Adam(q_network.parameters(), lr=0.001)
 memory = ReplayBuffer(10000)
 
@@ -27,10 +27,11 @@ cases_chart = []
 reward_chart = []
 (max_x, max_y) = (0, 0)
 
-process_bar = tqdm(total=100, desc="process")
+process_bar = tqdm(total=100000, desc="process")
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 for episode in range(num_episodes):
-    process_bar.update(0.00001)
+    process_bar.update(1)
     cases_chart.append(episode)
     # 进行多轮游戏的迭代
     state = env.reset()[0]
@@ -45,6 +46,7 @@ for episode in range(num_episodes):
         else:
             # 利用，已知概率之后执行最好的操作
             state_tensor = torch.FloatTensor(state).unsqueeze(0)
+            state_tensor = state_tensor.to(device)
             q_values = q_network(state_tensor)
             # 找到获得最大收益的操作数据
             action = torch.argmax(q_values).item()
@@ -75,11 +77,20 @@ for episode in range(num_episodes):
             next_state_batch = torch.FloatTensor(np.stack(next_state_batch))
             not_done_mask = torch.ByteTensor(~np.array(done_batch, dtype=np.uint8))  # 布尔张量， ～ 表示取反
 
+            state_batch = state_batch.to(device)
+            action_batch = action_batch.to(device)
+            next_state_batch = next_state_batch.to(device)
             current_q_values = q_network(state_batch).gather(1, action_batch.unsqueeze(1))
             next_max_q_values = q_network(next_state_batch).max(1)[0]
+            next_max_q_values = next_max_q_values.to(device)
+            not_done_mask = not_done_mask.to(device)
+            reward_batch = reward_batch.to(device)
             target_q_values = reward_batch + (gamma * next_max_q_values * not_done_mask)  # not_done_mask 是防止终止对于结果的影响
 
-            loss = nn.MSELoss()(current_q_values, target_q_values.unsqueeze(1))
+            current_q_values = current_q_values.to(device)
+            target_q_values = target_q_values.unsqueeze(1).to(device)
+
+            loss = nn.MSELoss()(current_q_values, target_q_values)
 
             optimizer.zero_grad()
             loss.backward()
